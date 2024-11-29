@@ -4,6 +4,6 @@ import (
 	"github.com/rivo/tview"
 )
 
-func Information() *tview.DropDown {
-	return tview.NewDropDown()
+func Information() *tview.TextArea {
+	return tview.NewTextArea()
 }

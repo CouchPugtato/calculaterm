@@ -7,13 +7,17 @@ import (
 
 func main() {
 	app := tview.NewApplication()
-	flex := tview.NewFlex().
-		AddItem(modules.Expressions(), 0, 0, false).
-		AddItem(tview.NewFlex().
-			AddItem(modules.Graph(), 0, 0, false).
-			AddItem(modules.Information(), 0, 0, false), 0, 0, false)
 
-	if err := app.SetRoot(flex, true).EnableMouse(true).Run(); err != nil {
+	graph := tview.NewFlex().SetDirection(tview.FlexColumnCSS).
+		AddItem(tview.NewTextArea().SetBorder(true), 0, modules.GraphSize, false).
+		AddItem(tview.NewTextArea().SetBorder(true), 0, modules.GraphSize/3, false).
+		AddItem(tview.NewTextArea().SetBorder(true), 0, modules.GraphSize/2, false)
+
+	full := tview.NewFlex().
+		AddItem(modules.Expressions, 0, 1, false).
+		AddItem(graph, 0, 1, false)
+
+	if err := app.SetRoot(full, true).EnableMouse(true).Run(); err != nil {
 		panic(err)
 	}
 }

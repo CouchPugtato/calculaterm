@@ -4,8 +4,8 @@ import (
 	"github.com/rivo/tview"
 )
 
-func Expressions() *tview.Flex {
-	flex := tview.NewFlex().SetDirection(tview.FlexRow)
+const boxHeight = 0
 
-	return flex
-}
+var Expressions *tview.Flex = tview.NewFlex().
+	SetDirection(tview.FlexColumnCSS).
+	AddItem(tview.NewInputField().SetBorder(true), 0, 1, true)
