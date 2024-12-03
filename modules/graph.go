@@ -6,8 +6,11 @@ import (
 
 const GraphSize = 16
 
-func Graph() *tview.TextView {
-	return tview.NewTextView()
+var Graph = tview.NewTextView()
+
+// Temperary function to print into graph
+func GraphPrint(a string) {
+	Graph.SetText(Graph.GetText(true) + "\n" + a)
 }
 
 /*

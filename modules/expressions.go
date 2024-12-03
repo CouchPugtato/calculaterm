@@ -13,13 +13,20 @@ import (
  */
 
 var possibleColors []tcell.Color
+var checkboxColor = tcell.NewRGBColor(160, 160, 175)
 
 func nextColor() tcell.Color {
 	if len(possibleColors) == 0 {
-		possibleColors = []tcell.Color{tcell.ColorBlue.TrueColor(), tcell.ColorRed.TrueColor(), tcell.ColorGreen.TrueColor(), tcell.ColorPurple.TrueColor(), tcell.ColorYellow.TrueColor(), tcell.ColorPink.TrueColor()}
+		possibleColors = []tcell.Color{
+			tcell.ColorBlue,
+			tcell.ColorRed,
+			tcell.ColorGreen,
+			tcell.ColorYellow,
+			tcell.ColorPink,
+		}
 	}
 	color := possibleColors[0]
-	possibleColors = possibleColors[0:] // double check to make sure this does as intended
+	possibleColors = possibleColors[1:] // double check to make sure this does as intended
 	return color
 }
 
@@ -46,24 +53,30 @@ type expression struct {
 
 var Expressions = []expression{}
 var focusedExpressionIndex = 0
-var queRefresh = false
+var queInputUpdate = false
+var queGraphUpdate = false
 var queRemove = -1
 
 // ExpressionBox is the main container for all 'Expression Field' elements, [fuctionality being] mainly for
 var ExpressionBox = tview.NewFlex().SetDirection(tview.FlexColumnCSS).
 	AddItem((func() *tview.Flex {
 		newExpression(0)
-		newExpression(1)
-		newExpression(2)
-		newExpression(3)
 		return Expressions[0].full
 	})(), 0, 1, false)
 
 // Updates BEFORE frame is drawn, returns true if drawing should not occur
 func ExpressionsUpdate() bool {
+	if queInputUpdate {
+		updateExpressionBox()
+		queInputUpdate = false
+	}
+	if queGraphUpdate {
+		RedrawGraph()
+		queGraphUpdate = false
+	}
 	if queRemove != -1 {
 		removeExpression(queRemove)
-
+		queRemove = -1
 	}
 	return false
 }
@@ -82,6 +95,8 @@ func updateExpressionBox() {
 	for _, expr := range Expressions {
 		ExpressionBox.AddItem(expr.full, 0, 1, false)
 	}
+
+	GraphPrint("expressionboxUpdated")
 }
 
 // Creates a new Expression, inserted at the index
@@ -101,17 +116,20 @@ func newExpression(index int) {
 	label.WriteString(strconv.Itoa(index + 1))
 	label.WriteString(" =")
 
+	var color = nextColor()
+
 	exprField := tview.NewInputField().
+		SetLabel(label.String()).
 		SetFieldTextColor(tcell.ColorWhite).
-		SetLabel(label.String())
+		SetFieldBackgroundColor(color)
 
 	responseField := tview.NewInputField().
 		SetFieldBackgroundColor(tcell.ColorWhite).
-		SetFieldTextColor(tcell.ColorWhite.TrueColor()).
-		SetText("Hello test")
+		SetFieldTextColor(tcell.ColorBlack.TrueColor()).
+		SetText("testing message")
 
 	enabledCheckbox := tview.NewCheckbox().
-		SetFieldBackgroundColor(tcell.NewRGBColor(160, 160, 175)).
+		SetFieldBackgroundColor(checkboxColor).
 		SetFieldTextColor(tcell.ColorBlack).
 		SetChecked(true)
 
@@ -131,7 +149,7 @@ func newExpression(index int) {
 			name:            label.String(),
 			isEnabled:       true,
 			hasError:        false,
-			color:           nextColor(),
+			color:           color,
 			index:           index,
 			function:        func(x float64) float64 { return 0 },
 			full:            full,
@@ -147,6 +165,7 @@ func newExpression(index int) {
 		if !Expressions[index].hasError {
 			RedrawGraph()
 		}
+		GraphPrint("Checked")
 	})
 	Expressions[index].responseField.SetChangedFunc(func(text string) {
 		// Error when trying to change, causes application to crash
@@ -155,25 +174,26 @@ func newExpression(index int) {
 	Expressions[index].expressionField.SetChangedFunc(func(text string) {
 		Expressions[index].formationString = formatExpressionText(text)
 		Expressions[index].function, Expressions[index].hasError = calculateExpression(text)
-		RedrawGraph()
+		queGraphUpdate = true
 	}).SetDoneFunc(func(key tcell.Key) {
 		switch key {
 		case tcell.KeyEnter:
-			newExpression(focusedExpressionIndex)
+			newExpression(focusedExpressionIndex + 1)
 		case tcell.KeyEscape:
-			return
+			//
 		case tcell.KeyTab:
 			// possibly link to autocomplete function
-			return
 		case tcell.KeyBackspace:
 			if Expressions[index].formationString == "" && Expressions[index].index != 0 {
 				queRemove = Expressions[index].index
 			}
-			return
 		}
 	}).SetFocusFunc(func() {
-
+		focusedExpressionIndex = Expressions[index].index
 	})
+
+	queInputUpdate = true
+	GraphPrint("Ran for index: " + strconv.Itoa(index) + "; ExprLen: " + strconv.Itoa(len(Expressions)))
 }
 
 // Removes an expression f
@@ -188,6 +208,10 @@ func removeExpression(index int) {
 func formatExpressionText(text string) string {
 	// TODO: replace later
 	return text
+}
+
+func renameVariable(originalName string, newName string) {
+	// go through all function generating strings and replace variables to thier new names
 }
 
 // Expression Evaluation --------------------------------------------

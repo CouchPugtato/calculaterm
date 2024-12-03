@@ -16,7 +16,7 @@ func main() {
 	})
 
 	graph := tview.NewFlex().SetDirection(tview.FlexColumnCSS).
-		AddItem(tview.NewTextArea().SetBorder(true), 0, modules.GraphSize, false).
+		AddItem(modules.Graph, 0, modules.GraphSize, false).
 		AddItem(tview.NewTextArea().SetBorder(true), 0, modules.GraphSize/3, false).
 		AddItem(tview.NewTextArea().SetBorder(true), 0, modules.GraphSize/2, false)
 
