@@ -9,7 +9,7 @@ import (
 )
 
 /* Colors for expressions, cycles through:
-* Blue -> Red -> Green -> Purple -> Yellow -> Pink
+* Blue -> Red -> Green -> Purple
  */
 
 var possibleColors []tcell.Color
@@ -21,7 +21,6 @@ func nextColor() tcell.Color {
 			tcell.ColorBlue,
 			tcell.ColorRed,
 			tcell.ColorGreen,
-			tcell.ColorYellow,
 			tcell.ColorPink,
 		}
 	}
@@ -30,9 +29,11 @@ func nextColor() tcell.Color {
 	return color
 }
 
+// returns a duller version of the inputted color, to show focus
+// TODO: Make work later if still needed
 func backgroundColor(color tcell.Color) tcell.Color {
 	r, g, b := color.RGB()
-	return tcell.NewRGBColor(r, g, b).TrueColor()
+	return tcell.NewRGBColor(r, g, b)
 }
 
 // expression strct declaration, used for containing...
@@ -82,15 +83,29 @@ func ExpressionsUpdate() bool {
 }
 
 func updateExpressionBox() {
+	var label strings.Builder
 	for index, expr := range Expressions {
+		// Changing the indexes of the expressions locally to match the real values
+		GraphPrint("Index before: " + strconv.Itoa(expr.index))
 		expr.index = index
+		GraphPrint("Index after: " + strconv.Itoa(expr.index))
 		if index == focusedExpressionIndex {
 			expr.expressionField.SetBackgroundColor(expr.color)
 		} else {
+			// TODO: not working
 			expr.expressionField.SetBackgroundColor(backgroundColor(expr.color))
 		}
+
+		//
+		label.Reset()
+		label.WriteString(" y")
+		label.WriteString(strconv.Itoa(index + 1))
+		label.WriteString(" =")
+		expr.expressionField.SetLabel(label.String())
+
 	}
 
+	// Refreshes ExpressionBox with updated expressions
 	ExpressionBox.Clear()
 	for _, expr := range Expressions {
 		ExpressionBox.AddItem(expr.full, 0, 1, false)
@@ -164,8 +179,8 @@ func newExpression(index int) {
 		Expressions[index].isEnabled = checked
 		if !Expressions[index].hasError {
 			RedrawGraph()
+			Graph.SetText("") //TODO: REMOVE
 		}
-		GraphPrint("Checked")
 	})
 	Expressions[index].responseField.SetChangedFunc(func(text string) {
 		// Error when trying to change, causes application to crash
@@ -193,7 +208,7 @@ func newExpression(index int) {
 	})
 
 	queInputUpdate = true
-	GraphPrint("Ran for index: " + strconv.Itoa(index) + "; ExprLen: " + strconv.Itoa(len(Expressions)))
+	GraphPrint("Ran for index: " + strconv.Itoa(Expressions[index].index) + "; ExprLen: " + strconv.Itoa(len(Expressions)))
 }
 
 // Removes an expression f
