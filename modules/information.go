@@ -4,6 +4,9 @@ import (
 	"github.com/rivo/tview"
 )
 
-func Information() *tview.TextArea {
-	return tview.NewTextArea()
+var Information = tview.NewTextArea()
+
+func InformationUpdate() bool {
+	// Updates BEFORE frame is drawn, returns true if drawing should not occur
+	return false
 }

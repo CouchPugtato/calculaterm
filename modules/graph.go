@@ -27,3 +27,12 @@ func GraphTraversial() *tview.Flex {
 	return tview.NewFlex().
 		AddItem(tview.NewBox().SetBorder(true), 0, 1, false)
 }
+
+func GraphUpdate() bool {
+	// Updates BEFORE frame is drawn, returns true if drawing should not occur
+	return false
+}
+
+func RedrawGraph() {
+
+}
