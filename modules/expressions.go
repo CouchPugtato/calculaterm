@@ -86,9 +86,7 @@ func updateExpressionBox() {
 	var label strings.Builder
 	for index, expr := range Expressions {
 		// Changing the indexes of the expressions locally to match the real values
-		GraphPrint("Index before: " + strconv.Itoa(expr.index))
 		expr.index = index
-		GraphPrint("Index after: " + strconv.Itoa(expr.index))
 		if index == focusedExpressionIndex {
 			expr.expressionField.SetBackgroundColor(expr.color)
 		} else {
@@ -110,8 +108,6 @@ func updateExpressionBox() {
 	for _, expr := range Expressions {
 		ExpressionBox.AddItem(expr.full, 0, 1, false)
 	}
-
-	GraphPrint("expressionboxUpdated")
 }
 
 // Creates a new Expression, inserted at the index
@@ -187,19 +183,20 @@ func newExpression(index int) {
 		Expressions[index].responseField.SetText(Expressions[index].responseText)
 	})
 	Expressions[index].expressionField.SetChangedFunc(func(text string) {
-		Expressions[index].formationString = formatExpressionText(text)
+		Expressions[index].formationString = text
 		Expressions[index].function, Expressions[index].hasError = calculateExpression(text)
 		queGraphUpdate = true
 	}).SetDoneFunc(func(key tcell.Key) {
 		switch key {
 		case tcell.KeyEnter:
+			Expressions[index].expressionField.SetText(formatExpressionText(Expressions[index].formationString))
 			newExpression(focusedExpressionIndex + 1)
 		case tcell.KeyEscape:
 			//
 		case tcell.KeyTab:
 			// possibly link to autocomplete function
-		case tcell.KeyBackspace:
-			if Expressions[index].formationString == "" && Expressions[index].index != 0 {
+		case tcell.KeyBacktab:
+			if Expressions[index].expressionField.GetText() == "" && Expressions[index].index != 0 {
 				queRemove = Expressions[index].index
 			}
 		}
@@ -208,14 +205,17 @@ func newExpression(index int) {
 	})
 
 	queInputUpdate = true
-	GraphPrint("Ran for index: " + strconv.Itoa(Expressions[index].index) + "; ExprLen: " + strconv.Itoa(len(Expressions)))
 }
 
-// Removes an expression f
 func removeExpression(index int) {
+	for i := len(Expressions); i > index; i-- {
+		renameVariable(Expressions[i].name, Expressions[i-1].name)
+		// add something to replace all instances of expression at index with the text inside of that expression
+	}
+
 	Expressions = append(
 		Expressions[:index],
-		Expressions[index:]...)
+		Expressions[index+1:]...)
 	updateExpressionBox()
 }
 
