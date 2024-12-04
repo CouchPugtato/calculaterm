@@ -56,6 +56,7 @@ var Expressions = []expression{}
 var focusedExpressionIndex = 0
 var queInputUpdate = false
 var queGraphUpdate = false
+var queResponseUpdate = false
 var queRemove = -1
 
 // ExpressionBox is the main container for all 'Expression Field' elements, [fuctionality being] mainly for
@@ -67,10 +68,6 @@ var ExpressionBox = tview.NewFlex().SetDirection(tview.FlexColumnCSS).
 
 // Updates BEFORE frame is drawn, returns true if drawing should not occur
 func ExpressionsUpdate() bool {
-	if queInputUpdate {
-		updateExpressionBox()
-		queInputUpdate = false
-	}
 	if queGraphUpdate {
 		RedrawGraph()
 		queGraphUpdate = false
@@ -78,6 +75,14 @@ func ExpressionsUpdate() bool {
 	if queRemove != -1 {
 		removeExpression(queRemove)
 		queRemove = -1
+	}
+	if queInputUpdate {
+		updateExpressionBox()
+		queInputUpdate = false
+	}
+	if queResponseUpdate {
+		maintainResponses()
+		queResponseUpdate = false
 	}
 	return false
 }
@@ -94,7 +99,7 @@ func updateExpressionBox() {
 			expr.expressionField.SetBackgroundColor(backgroundColor(expr.color))
 		}
 
-		//
+		// Changes the expression names to be
 		label.Reset()
 		label.WriteString(" y")
 		label.WriteString(strconv.Itoa(index + 1))
@@ -108,6 +113,14 @@ func updateExpressionBox() {
 	for _, expr := range Expressions {
 		ExpressionBox.AddItem(expr.full, 0, 1, false)
 	}
+}
+
+// Correct any changes made to the response mesages
+func maintainResponses() {
+	for _, expr := range Expressions {
+		expr.responseField.SetText(expr.responseText)
+	}
+
 }
 
 // Creates a new Expression, inserted at the index
@@ -166,7 +179,7 @@ func newExpression(index int) {
 			full:            full,
 			expressionField: exprField,
 			responseField:   responseField,
-			responseText:    "",
+			responseText:    "Test",
 			enabledCheckbox: enabledCheckbox,
 		}},
 			Expressions[index:]...)...)
@@ -180,7 +193,7 @@ func newExpression(index int) {
 	})
 	Expressions[index].responseField.SetChangedFunc(func(text string) {
 		// Error when trying to change, causes application to crash
-		Expressions[index].responseField.SetText(Expressions[index].responseText)
+		queResponseUpdate = true
 	})
 	Expressions[index].expressionField.SetChangedFunc(func(text string) {
 		Expressions[index].formationString = text
@@ -233,5 +246,11 @@ func renameVariable(originalName string, newName string) {
 
 // Returns a generating function
 func calculateExpression(text string) (func(x float64) float64, bool) {
+	/*
+		terms := strings.Split(text, "")
+		for i, term := range terms {
+
+		}
+	*/
 	return func(x float64) float64 { return 0 }, false
 }
