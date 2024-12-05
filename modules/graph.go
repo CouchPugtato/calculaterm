@@ -4,11 +4,16 @@ import (
 	"github.com/rivo/tview"
 )
 
-const GraphSize = 16
+const GraphSize = 16 // graph proportionality in the flex that it is inside of, all other components scale off of it
+var lastGraphSize = [2]int{0, 0}
 
-var Graph = tview.NewTextView()
+const graphLiner = '╋'
+const graphSpacer = '━'
 
-// Temperary function to print into graph
+var Graph = tview.NewTextView().
+	SetText("╋╳╳╳╳╳╳╳╳╳╳╳\n╋╳╳╳╳╳╳╳╳╳╳\n╋╳╳╳╳╳╳╳╳╳╳╳╳\n╋╳╳╳╳╳╳╳╳╳╳╳╳╳\n╋╳╳╳╳╳╳╳╳╳╳╳\n╋╳╳╳╳╳╳╳╳╳╳╳\n╋╳╳╳╳╳╳╳╳╳╳╳╳\n╋╳╳╳╳╳╳╳╳╳╳╳╳\n╋━╋━╋━╋━╋━╋")
+
+// Temporary function to print into graph
 func GraphPrint(a string) {
 	Graph.SetText(Graph.GetText(true) + "\n" + a)
 }
@@ -33,6 +38,14 @@ func GraphTraversial() *tview.Flex {
 
 func GraphUpdate() bool {
 	// Updates BEFORE frame is drawn, returns true if drawing should not occur
+
+	_, _, newWidth, newHeight := Graph.GetRect()
+	if newWidth != lastGraphSize[0] || newHeight != lastGraphSize[1] {
+		lastGraphSize[0] = newWidth
+		lastGraphSize[1] = newHeight
+		RedrawGraph()
+	}
+
 	return false
 }
 
