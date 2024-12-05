@@ -3,6 +3,7 @@ package modules
 import (
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -56,7 +57,8 @@ var Expressions = []expression{}
 var focusedExpressionIndex = 0
 var queInputUpdate = false
 var queGraphUpdate = false
-var queResponseUpdate = false
+var queResponseUpdate = true
+var lastFieldSize = 0
 var queRemove = -1
 
 // ExpressionBox is the main container for all 'Expression Field' elements, [fuctionality being] mainly for
@@ -80,8 +82,11 @@ func ExpressionsUpdate() bool {
 		updateExpressionBox()
 		queInputUpdate = false
 	}
-	if queResponseUpdate {
+
+	_, _, newFieldSize, _ := Expressions[0].responseField.GetRect()
+	if queResponseUpdate || lastFieldSize != newFieldSize {
 		maintainResponses()
+		lastFieldSize = newFieldSize
 		queResponseUpdate = false
 	}
 	return false
@@ -98,6 +103,7 @@ func updateExpressionBox() {
 			// TODO: not working
 			expr.expressionField.SetBackgroundColor(backgroundColor(expr.color))
 		}
+		expr.responseField.SetFieldBackgroundColor(tcell.ColorWhite)
 
 		// Changes the expression names to be
 		label.Reset()
@@ -105,7 +111,6 @@ func updateExpressionBox() {
 		label.WriteString(strconv.Itoa(index + 1))
 		label.WriteString(" =")
 		expr.expressionField.SetLabel(label.String())
-
 	}
 
 	// Refreshes ExpressionBox with updated expressions
@@ -117,10 +122,18 @@ func updateExpressionBox() {
 
 // Correct any changes made to the response mesages
 func maintainResponses() {
+	var spacer strings.Builder
 	for _, expr := range Expressions {
 		expr.responseField.SetText(expr.responseText)
-	}
+		expr.responseField.SetText(expr.responseText)
 
+		_, _, width, _ := expr.responseField.GetRect()
+		spacer.Reset()
+		for i := 0; i < (width - utf8.RuneCountInString(expr.responseText)); i++ {
+			spacer.WriteRune(' ')
+		}
+		expr.responseField.SetLabel(spacer.String())
+	}
 }
 
 // Creates a new Expression, inserted at the index
@@ -132,7 +145,6 @@ func newExpression(index int) {
 				- Enable/Disable Function Checkbox, whether or not the function should be displayed on the graph/information
 				- Function input field, responsible for the collection of the function generating text
 			- Flex "Container" (CSS Row)
-				- Empty Box used for spacing
 				- Read-only input field, used for reporting information back to the user
 	*/
 	var label strings.Builder
@@ -148,8 +160,9 @@ func newExpression(index int) {
 		SetFieldBackgroundColor(color)
 
 	responseField := tview.NewInputField().
-		SetFieldBackgroundColor(tcell.ColorWhite).
-		SetFieldTextColor(tcell.ColorBlack.TrueColor()).
+		SetLabelWidth(0).SetLabelColor(tcell.ColorBlack). // Use label to space response size
+		SetFieldBackgroundColor(tcell.ColorBlack).
+		SetFieldTextColor(tcell.ColorBlack).
 		SetText("testing message")
 
 	enabledCheckbox := tview.NewCheckbox().
@@ -162,9 +175,7 @@ func newExpression(index int) {
 			AddItem(enabledCheckbox, 1, 1, false).
 			AddItem(exprField, 0, 20, false),
 			1, 1, false).
-		AddItem(tview.NewFlex().SetDirection(tview.FlexRowCSS).
-			AddItem(tview.NewBox(), 0, 4, false).
-			AddItem(responseField, 0, 1, false), 0, 1, false)
+		AddItem(responseField, 0, 1, false)
 
 	Expressions = append(
 		Expressions[:index],
@@ -179,7 +190,7 @@ func newExpression(index int) {
 			full:            full,
 			expressionField: exprField,
 			responseField:   responseField,
-			responseText:    "Test",
+			responseText:    "Testing today",
 			enabledCheckbox: enabledCheckbox,
 		}},
 			Expressions[index:]...)...)
@@ -188,11 +199,9 @@ func newExpression(index int) {
 		Expressions[index].isEnabled = checked
 		if !Expressions[index].hasError {
 			RedrawGraph()
-			Graph.SetText("") //TODO: REMOVE
 		}
 	})
 	Expressions[index].responseField.SetChangedFunc(func(text string) {
-		// Error when trying to change, causes application to crash
 		queResponseUpdate = true
 	})
 	Expressions[index].expressionField.SetChangedFunc(func(text string) {
@@ -218,6 +227,7 @@ func newExpression(index int) {
 	})
 
 	queInputUpdate = true
+	queResponseUpdate = true
 }
 
 func removeExpression(index int) {
@@ -254,3 +264,5 @@ func calculateExpression(text string) (func(x float64) float64, bool) {
 	*/
 	return func(x float64) float64 { return 0 }, false
 }
+
+// split exponentials by ^
