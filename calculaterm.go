@@ -6,6 +6,12 @@ import (
 	"github.com/rivo/tview"
 )
 
+const (
+	graphSize       = 16
+	controlsSize    = graphSize / 3
+	informationSize = graphSize / 2
+)
+
 func main() {
 	app := tview.NewApplication()
 
@@ -17,8 +23,8 @@ func main() {
 
 	graph := tview.NewFlex().SetDirection(tview.FlexColumnCSS).
 		AddItem(modules.Graph, 0, modules.GraphSize, false).
-		AddItem(tview.NewTextArea().SetBorder(true), 0, modules.GraphSize/3, false).
-		AddItem(tview.NewTextArea().SetBorder(true), 0, modules.GraphSize/2, false)
+		AddItem(tview.NewTextArea().SetBorder(true), 0, controlsSize, false).
+		AddItem(modules.Information, 0, informationSize, false)
 
 	full := tview.NewFlex().
 		AddItem(modules.ExpressionBox, 0, 1, false).
