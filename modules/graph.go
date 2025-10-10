@@ -142,15 +142,22 @@ func createGraph() image.Image {
 	// }
 
 	// Plot all function expressions
-	resolution := lastImageWidth * 2
-	prevY := -1
-	prevX := -1
 
 	for _, expression := range Expressions {
+		if expression.err != nil || !expression.enabledCheckbox.IsChecked() {
+			continue
+		}
+		resolution := lastImageWidth * 2
+		prevY := -1
+		prevX := -1
+
 		for i := 0; i < resolution; i++ {
 			// Map x coordinate
 			xVal := mapRange(float64(i), 0, float64(resolution-1), xMin, xMax)
-			yVal := expression.function(xVal)
+			yVal, err := expression.function(xVal)
+			if err != nil {
+				continue
+			}
 
 			// Map to image coordinates
 			if yVal >= yMin && yVal <= yMax {
@@ -183,7 +190,7 @@ func createGraph() image.Image {
 									for ddy := -lineWidth / 2; ddy <= lineWidth/2; ddy++ {
 										if ddx*ddx+ddy*ddy <= (lineWidth/2)*(lineWidth/2) {
 											if x+ddx >= 0 && x+ddx < lastImageWidth && y+ddy >= 0 && y+ddy < lastImageHeight {
-												img.Set(x+ddx, y+ddy, color.RGBA{255, 0, 0, 255})
+												img.Set(x+ddx, y+ddy, convertColorType(expression.color))
 											}
 										}
 									}
