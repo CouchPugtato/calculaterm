@@ -25,7 +25,7 @@ func nextColor() tcell.Color {
 			tcell.ColorBlue,
 			tcell.ColorRed,
 			tcell.ColorGreen,
-			tcell.ColorPink,
+			tcell.NewRGBColor(118, 97, 239), // purple
 		}
 	}
 	color := possibleColors[0]
@@ -142,7 +142,7 @@ func newExpression(index int) {
 			- Flex "Container" (CSS Row)
 				- Read-only input field, used for reporting information back to the user
 	*/
-	defaultName := "y" + strconv.Itoa(index+1)
+	defaultName := nextUnusedYName()
 	var color = nextColor()
 
 	exprField := tview.NewInputField().
@@ -292,6 +292,22 @@ func newExpression(index int) {
 
 	queInputUpdate = true
 	queResponseUpdate = true
+}
+
+func nextUnusedYName() string {
+	max := 0
+	for _, e := range Expressions {
+		name := strings.ToLower(strings.TrimSpace(e.name))
+		if len(name) >= 2 && name[0] == 'y' {
+			numStr := name[1:]
+			if n, err := strconv.Atoi(numStr); err == nil {
+				if n > max {
+					max = n
+				}
+			}
+		}
+	}
+	return "y" + strconv.Itoa(max+1)
 }
 
 func removeExpression(index int) {
