@@ -112,7 +112,7 @@ func updateExpressionBox() {
 	// Refreshes ExpressionBox with updated expressions
 	ExpressionBox.Clear()
 	for _, expr := range Expressions {
-		ExpressionBox.AddItem(expr.full, 0, 1, false)
+		ExpressionBox.AddItem(expr.full, 3, 0, false)
 	}
 }
 
@@ -120,7 +120,6 @@ func updateExpressionBox() {
 func maintainResponses() {
 	var spacer strings.Builder
 	for _, expr := range Expressions {
-		expr.responseField.SetText(expr.responseText)
 		expr.responseField.SetText(expr.responseText)
 
 		_, _, width, _ := expr.responseField.GetRect()
@@ -369,11 +368,12 @@ type Token struct {
 
 // Operator precedence
 var precedence = map[string]int{
-	"+": 1,
-	"-": 1,
-	"*": 2,
-	"/": 2,
-	"^": 3,
+	"+":  1,
+	"-":  1,
+	"*":  2,
+	"/":  2,
+	"^":  3,
+	"u-": 2, // unary minus has higher precedence than +,- and same as */
 }
 
 // Mathematical constants
@@ -507,6 +507,20 @@ func tokenize(expr string) ([]Token, error) {
 
 		// Handle operators
 		if char == "+" || char == "-" || char == "*" || char == "/" || char == "^" {
+			// Determine if '-' is unary based on previous token
+			if char == "-" {
+				prevIsStart := len(tokens) == 0
+				prev := Token{Type: OPERATOR}
+				if !prevIsStart {
+					prev = tokens[len(tokens)-1]
+				}
+				if prevIsStart || prev.Type == OPERATOR || prev.Type == LPAREN {
+					// Unary minus
+					tokens = append(tokens, Token{Type: OPERATOR, Value: "u-", Position: curPos})
+					i++
+					continue
+				}
+			}
 			tokens = append(tokens, Token{Type: OPERATOR, Value: char, Position: curPos})
 			i++
 			continue
@@ -796,6 +810,14 @@ func CreateFunction(expr string) (func(float64) (float64, error), error) {
 				stack = append(stack, mathConstants[token.Value])
 
 			case OPERATOR:
+				if token.Value == "u-" {
+					if len(stack) < 1 {
+						return 0, errors.New("invalid expression: not enough operands for unary minus")
+					}
+					a := stack[len(stack)-1]
+					stack[len(stack)-1] = -a
+					break
+				}
 				if len(stack) < 2 {
 					return 0, errors.New("invalid expression: not enough operands")
 				}
@@ -933,7 +955,15 @@ func validateTokenSequence(tokens []Token) error {
 		// Check for invalid sequences
 		switch curr.Type {
 		case OPERATOR:
+			// Allow unary minus to follow another operator
 			if next.Type == OPERATOR {
+				if next.Value == "u-" {
+					// Disallow consecutive unary minus  which is ambiguous in current shunting yard
+					if curr.Value == "u-" {
+						return &ExpressionError{"consecutive unary minus", next.Position}
+					}
+					continue
+				}
 				return &ExpressionError{"consecutive operators", next.Position}
 			}
 		case NUMBER:
@@ -952,7 +982,7 @@ func validateTokenSequence(tokens []Token) error {
 			if next.Type == RPAREN {
 				return &ExpressionError{"empty parentheses", next.Position}
 			}
-			if next.Type == OPERATOR {
+			if next.Type == OPERATOR && next.Value != "u-" {
 				return &ExpressionError{"operator after opening parenthesis", next.Position}
 			}
 		case RPAREN:
@@ -977,7 +1007,7 @@ func validateTokenSequence(tokens []Token) error {
 		first := tokens[0]
 		last := tokens[len(tokens)-1]
 
-		if first.Type == OPERATOR && first.Value != "-" {
+		if first.Type == OPERATOR && first.Value != "-" && first.Value != "u-" {
 			return &ExpressionError{"expression cannot start with operator", first.Position}
 		}
 		if last.Type == OPERATOR {
