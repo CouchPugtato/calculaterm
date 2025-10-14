@@ -187,8 +187,19 @@ func newExpression(index int) {
 			Expressions[index:]...)...)
 
 	Expressions[index].enabledCheckbox.SetChangedFunc(func(checked bool) {
-		Expressions[index].isEnabled = checked
-		if Expressions[index].err == nil {
+		// Find current index for this row to avoid stale captured index
+		curr := -1
+		for i := range Expressions {
+			if Expressions[i].expressionField == exprField {
+				curr = i
+				break
+			}
+		}
+		if curr == -1 {
+			return
+		}
+		Expressions[curr].isEnabled = checked
+		if Expressions[curr].err == nil {
 			RedrawGraph()
 		}
 	})
@@ -196,6 +207,17 @@ func newExpression(index int) {
 		queResponseUpdate = true
 	})
 	Expressions[index].expressionField.SetChangedFunc(func(text string) {
+		// Resolve current index dynamically to handle deletions and insertions
+		curr := -1
+		for i := range Expressions {
+			if Expressions[i].expressionField == exprField {
+				curr = i
+				break
+			}
+		}
+		if curr == -1 {
+			return
+		}
 		// Support editing name inline via definition syntax: name = expression
 		raw := strings.TrimSpace(text)
 		var defName string
@@ -223,8 +245,8 @@ func newExpression(index int) {
 				// More than one space before '=' is not allowed
 				// Position points at the second trailing space
 				pos := eqPos - trailingSpaces + 1
-				Expressions[index].err = &ExpressionError{"only one space allowed before '='", pos}
-				Expressions[index].responseText = Expressions[index].err.Error()
+				Expressions[curr].err = &ExpressionError{"only one space allowed before '='", pos}
+				Expressions[curr].responseText = Expressions[curr].err.Error()
 				queResponseUpdate = true
 				return
 			}
@@ -235,8 +257,8 @@ func newExpression(index int) {
 				// Find the first internal space position
 				spacePos := strings.Index(coreLeft, " ")
 				// Map to original text position
-				Expressions[index].err = &ExpressionError{"identifier cannot contain spaces", spacePos}
-				Expressions[index].responseText = Expressions[index].err.Error()
+				Expressions[curr].err = &ExpressionError{"identifier cannot contain spaces", spacePos}
+				Expressions[curr].responseText = Expressions[curr].err.Error()
 				queResponseUpdate = true
 				return
 			}
@@ -245,8 +267,8 @@ func newExpression(index int) {
 			rhs = strings.TrimSpace(parts[1])
 			if defName != "" && isValidIdentifier(defName) {
 				// Update name and label dynamically
-				old := Expressions[index].name
-				Expressions[index].name = defName
+				old := Expressions[curr].name
+				Expressions[curr].name = defName
 				if old != defName {
 					renameVariable(old, defName)
 				}
@@ -258,18 +280,18 @@ func newExpression(index int) {
 			rhs = raw
 		}
 
-		Expressions[index].formationString = rhs
-		Expressions[index].function, Expressions[index].err = CreateFunction(rhs)
-		if Expressions[index].err == nil {
-			Expressions[index].responseText = ""
+		Expressions[curr].formationString = rhs
+		Expressions[curr].function, Expressions[curr].err = CreateFunction(rhs)
+		if Expressions[curr].err == nil {
+			Expressions[curr].responseText = ""
 			// Register this expression under its name for cross-reference
-			nameKey := strings.ToLower(Expressions[index].name)
-			userFunctions[nameKey] = Expressions[index].function
+			nameKey := strings.ToLower(Expressions[curr].name)
+			userFunctions[nameKey] = Expressions[curr].function
 			queGraphUpdate = true
 		} else {
-			Expressions[index].responseText = Expressions[index].err.Error()
+			Expressions[curr].responseText = Expressions[curr].err.Error()
 			// If invalid, remove from user functions to avoid stale references
-			delete(userFunctions, strings.ToLower(Expressions[index].name))
+			delete(userFunctions, strings.ToLower(Expressions[curr].name))
 		}
 		queResponseUpdate = true
 	}).SetDoneFunc(func(key tcell.Key) {
@@ -287,7 +309,40 @@ func newExpression(index int) {
 			}
 		}
 	}).SetFocusFunc(func() {
-		focusedExpressionIndex = Expressions[index].index
+		curr := -1
+		for i := range Expressions {
+			if Expressions[i].expressionField == exprField {
+				curr = i
+				break
+			}
+		}
+		if curr != -1 {
+			focusedExpressionIndex = Expressions[curr].index
+		}
+	})
+
+	// Capture Backspace when the input is empty to remove the expression row
+	Expressions[index].expressionField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyBackspace || event.Key() == tcell.KeyBackspace2 {
+			curr := -1
+			for i := range Expressions {
+				if Expressions[i].expressionField == exprField {
+					curr = i
+					break
+				}
+			}
+			if curr == -1 {
+				return event
+			}
+			if Expressions[curr].expressionField.GetText() == "" {
+				if len(Expressions) > 1 && Expressions[curr].index != 0 {
+					queRemove = Expressions[curr].index
+				}
+				// Swallow the event to avoid unnecessary redraws of a now removed field
+				return nil
+			}
+		}
+		return event
 	})
 
 	queInputUpdate = true
@@ -311,7 +366,8 @@ func nextUnusedYName() string {
 }
 
 func removeExpression(index int) {
-	for i := len(Expressions); i > index; i-- {
+	// Shift names upward to keep yN ordering stable
+	for i := len(Expressions) - 1; i > index; i-- {
 		renameVariable(Expressions[i].name, Expressions[i-1].name)
 		// add something to replace all instances of expression at index with the text inside of that expression
 	}
