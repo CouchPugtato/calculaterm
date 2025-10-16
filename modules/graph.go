@@ -1,10 +1,12 @@
 package modules
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
 	"math"
+	"strconv"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -19,21 +21,137 @@ var lastImageWidth = 800
 var lastImageHeight = 600
 var queRedraw = false
 
-/*
-func graphMouseHandling(action tview.MouseAction, event *tcell.EventMouse) (tview.MouseAction, *tcell.EventMouse) {
+// Mutable graph bounds
+var viewXMin = -10.0
+var viewXMax = 10.0
+var viewYMin = -5.0
+var viewYMax = 5.0
 
-}
-*/
 func GraphTraversial() *tview.Flex {
-	/*
-		buttons needed:
-			- Home button
-			- zoom out
-			- zoom in
-			- up, right, left, down
-	*/
+	// Vertical, expression-like rows: each parameter is one row
+	// with a title label in front of the input, matching outline & height.
+	format := func(v float64) string { return fmt.Sprintf("%g", v) }
 
-	return tview.NewFlex().AddItem(tview.NewBox().SetBorder(true), 0, 1, false)
+	// Helper to make a row structured like expression rows
+	makeRow := func(field *tview.InputField) *tview.Flex {
+		return tview.NewFlex().SetDirection(tview.FlexColumnCSS).
+			AddItem(
+				tview.NewFlex().SetDirection(tview.FlexRowCSS).
+					AddItem(tview.NewBox(), 1, 1, false). // top spacer to match expression row outline
+					AddItem(field, 0, 20, true),
+				1, 1, false,
+			)
+	}
+
+	// X controls
+	xMinLabel := "X min: "
+	xMinField := tview.NewInputField().
+		SetLabel(xMinLabel).
+		SetFieldTextColor(tcell.ColorBlack).
+		SetFieldBackgroundColor(tcell.ColorWhite).
+		SetText(format(viewXMin))
+	xMaxLabel := "X max: "
+	xMaxField := tview.NewInputField().
+		SetLabel(xMaxLabel).
+		SetFieldTextColor(tcell.ColorBlack).
+		SetFieldBackgroundColor(tcell.ColorWhite).
+		SetText(format(viewXMax))
+
+	// Y controls
+	yMinLabel := "Y min: "
+	yMinField := tview.NewInputField().
+		SetLabel(yMinLabel).
+		SetFieldTextColor(tcell.ColorBlack).
+		SetFieldBackgroundColor(tcell.ColorWhite).
+		SetText(format(viewYMin))
+	yMaxLabel := "Y max: "
+	yMaxField := tview.NewInputField().
+		SetLabel(yMaxLabel).
+		SetFieldTextColor(tcell.ColorBlack).
+		SetFieldBackgroundColor(tcell.ColorWhite).
+		SetText(format(viewYMax))
+
+	// Commit handlers: apply on Enter and validate
+	xMinField.SetDoneFunc(func(key tcell.Key) {
+		if key != tcell.KeyEnter {
+			return
+		}
+		if f, err := strconv.ParseFloat(xMinField.GetText(), 64); err == nil {
+			if f >= viewXMax {
+				InfoPrint("X min must be less than X max")
+				return
+			}
+			viewXMin = f
+			RedrawGraph()
+		} else {
+			InfoPrint("Invalid X min")
+		}
+	})
+	xMaxField.SetDoneFunc(func(key tcell.Key) {
+		if key != tcell.KeyEnter {
+			return
+		}
+		if f, err := strconv.ParseFloat(xMaxField.GetText(), 64); err == nil {
+			if f <= viewXMin {
+				InfoPrint("X max must be greater than X min")
+				return
+			}
+			viewXMax = f
+			RedrawGraph()
+		} else {
+			InfoPrint("Invalid X max")
+		}
+	})
+
+	yMinField.SetDoneFunc(func(key tcell.Key) {
+		if key != tcell.KeyEnter {
+			return
+		}
+		if f, err := strconv.ParseFloat(yMinField.GetText(), 64); err == nil {
+			if f >= viewYMax {
+				InfoPrint("Y min must be less than Y max")
+				return
+			}
+			viewYMin = f
+			RedrawGraph()
+		} else {
+			InfoPrint("Invalid Y min")
+		}
+	})
+	yMaxField.SetDoneFunc(func(key tcell.Key) {
+		if key != tcell.KeyEnter {
+			return
+		}
+		if f, err := strconv.ParseFloat(yMaxField.GetText(), 64); err == nil {
+			if f <= viewYMin {
+				InfoPrint("Y max must be greater than Y min")
+				return
+			}
+			viewYMax = f
+			RedrawGraph()
+		} else {
+			InfoPrint("Invalid Y max")
+		}
+	})
+
+	// Layout: three rows; each row contains two fields side by side
+	row1 := tview.NewFlex().SetDirection(tview.FlexRowCSS).
+		AddItem(makeRow(xMinField), 0, 1, true).
+		AddItem(tview.NewBox(), 1, 0, false).
+		AddItem(makeRow(xMaxField), 0, 1, false)
+
+	// Second row: Y min | Y max
+	row2 := tview.NewFlex().SetDirection(tview.FlexRowCSS).
+		AddItem(makeRow(yMinField), 0, 1, false).
+		AddItem(tview.NewBox(), 1, 0, false).
+		AddItem(makeRow(yMaxField), 0, 1, false)
+
+	controls := tview.NewFlex().SetDirection(tview.FlexColumnCSS)
+	// Reduce vertical spacing by tightening row heights
+	controls.AddItem(row1, 2, 0, true)
+	controls.AddItem(row2, 2, 0, false)
+
+	return controls
 }
 
 // Updates BEFORE frame is drawn, returns true if drawing should not occur
@@ -53,19 +171,14 @@ func GraphUpdate() bool {
 
 func RedrawGraph() {
 	Graph.SetImage(createGraph())
-	InfoPrint("Graph Redrawn")
 }
 
 const (
-	xMin        = -10.0 // these should be taken from information.go
-	xMax        = 10.0  // ^
-	yMin        = -5.0  // ^
-	yMax        = 5.0   // ^
-	lineWidth   = 20    // Width of the function line
-	axisWidth   = 20    // Width of the axes
-	tickLength  = 50    // Length of tick marks
-	tickWidth   = 20    // Width of tick marks
-	tickSpacing = 50    // Space between ticks in graph units
+	lineWidth   = 20 // Width of the function line
+	axisWidth   = 20 // Width of the axes
+	tickLength  = 50 // Length of tick marks
+	tickWidth   = 20 // Width of tick marks
+	tickSpacing = 50 // Space between ticks in graph units
 )
 
 // map a value from one range to another
@@ -81,8 +194,8 @@ func createGraph() image.Image {
 	draw.Draw(img, img.Bounds(), &image.Uniform{color.White}, image.Point{}, draw.Src)
 
 	// Draw axes
-	xAxis := int(mapRange(0, yMin, yMax, float64(lastImageHeight-1), 0))
-	yAxis := int(mapRange(0, xMin, xMax, 0, float64(lastImageWidth-1)))
+	xAxis := int(mapRange(0, viewYMin, viewYMax, float64(lastImageHeight-1), 0))
+	yAxis := int(mapRange(0, viewXMin, viewXMax, 0, float64(lastImageWidth-1)))
 	for x := 0; x < lastImageWidth; x++ {
 		for dy := -axisWidth / 2; dy <= axisWidth/2; dy++ {
 			for dx := -axisWidth / 2; dx <= axisWidth/2; dx++ {
@@ -153,16 +266,16 @@ func createGraph() image.Image {
 
 		for i := 0; i < resolution; i++ {
 			// Map x coordinate
-			xVal := mapRange(float64(i), 0, float64(resolution-1), xMin, xMax)
+			xVal := mapRange(float64(i), 0, float64(resolution-1), viewXMin, viewXMax)
 			yVal, err := expression.function(xVal)
 			if err != nil {
 				continue
 			}
 
 			// Map to image coordinates
-			if yVal >= yMin && yVal <= yMax {
+			if yVal >= viewYMin && yVal <= viewYMax {
 				px := int(mapRange(float64(i), 0, float64(resolution-1), 0, float64(lastImageWidth-1)))
-				py := int(mapRange(yVal, yMin, yMax, float64(lastImageHeight-1), 0))
+				py := int(mapRange(yVal, viewYMin, viewYMax, float64(lastImageHeight-1), 0))
 
 				if py >= 0 && py < lastImageHeight && px >= 0 && px < lastImageWidth {
 					// Draw point with circular thickness

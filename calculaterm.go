@@ -21,10 +21,10 @@ func main() {
 			modules.InformationUpdate()
 	})
 
-	graph := tview.NewFlex().SetDirection(tview.FlexColumnCSS).
-		AddItem(modules.Graph, 0, modules.GraphSize, false).
-		AddItem(tview.NewTextArea().SetBorder(true), 0, controlsSize, false).
-		AddItem(modules.Information, 0, informationSize, false)
+    graph := tview.NewFlex().SetDirection(tview.FlexColumnCSS).
+        AddItem(modules.Graph, 0, modules.GraphSize, false).
+        AddItem(modules.GraphTraversial(), 0, controlsSize, false).
+        AddItem(modules.Information, 0, informationSize, false)
 
 	full := tview.NewFlex().
 		AddItem(modules.ExpressionBox, 0, 1, false).
