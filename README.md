@@ -1,5 +1,7 @@
 # Calculaterm — Terminal Graphing Calculator
 
+![Showcase of Capabilities](docs/img/showcase.png)
+
 [![Build](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/CouchPugtato/calculaterm/actions)
 [![Last Commit](https://img.shields.io/github/last-commit/CouchPugtato/calculaterm)](https://github.com/CouchPugtato/calculaterm/commits/main)
 [![Go](https://img.shields.io/badge/Go-1.23-blue)](go.mod)
@@ -7,7 +9,6 @@
 ## Table of Contents
 - [Overview](#overview)
 - [Architecture / Design](#architecture--design)
-- [Screenshots / Demo](#screenshots--demo)
 - [Quick Start / Installation](#quick-start--installation)
 - [Usage](#usage)
 - [Configuration](#configuration)
@@ -44,12 +45,6 @@ flowchart LR
     UF --> C
     R --> B
 ```
-
-References:
-- Main layout: <mcfile name="calculaterm.go" path="c:\Projects\Repositories\calculaterm\calculaterm.go"></mcfile>
-- Expressions, parsing, derivatives: <mcfile name="modules/expressions.go" path="c:\Projects\Repositories\calculaterm\modules\expressions.go"></mcfile>
-- Graph rendering & controls: <mcfile name="modules/graph.go" path="c:\Projects\Repositories\calculaterm\modules\graph.go"></mcfile>
-- Information pane: <mcfile name="modules/information.go" path="c:\Projects\Repositories\calculaterm\modules\information.go"></mcfile>
 
 ## Quick Start / Installation
 Prerequisites:
