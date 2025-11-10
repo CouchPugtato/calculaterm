@@ -35,14 +35,13 @@ flowchart LR
     subgraph UI
       A[ExpressionBox]
       B[Graph Image]
-      C[Graph Controls (X/Y min/max)]
-      D[Information Pane]
+      C[Information Pane]
     end
 
     A -- edit/define --> P[Parser & Validator]
     P --> UF[User Functions / Constants]
     UF --> R[RedrawGraph]
-    C --> R
+    UF --> C
     R --> B
 ```
 
