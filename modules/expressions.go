@@ -283,7 +283,32 @@ func newExpression(index int) {
 		Expressions[curr].formationString = rhs
 		Expressions[curr].function, Expressions[curr].err = CreateFunction(rhs)
 		if Expressions[curr].err == nil {
-			Expressions[curr].responseText = ""
+			// If expression is constant (no standalone variable 'x'), show its value as "= [X]"
+			if toks, tokErr := tokenize(rhs); tokErr == nil {
+				isConst := true
+				for _, t := range toks {
+					if t.Type == VARIABLE {
+						isConst = false
+						break
+					}
+				}
+				if isConst {
+					// Evaluate once to display the constant value
+					if pf, pfErr := toPostfix(toks); pfErr == nil {
+						if val, evErr := evaluatePostfix(pf, toks, 0); evErr == nil {
+							Expressions[curr].responseText = fmt.Sprintf("= %g", val)
+						} else {
+							Expressions[curr].responseText = ""
+						}
+					} else {
+						Expressions[curr].responseText = ""
+					}
+				} else {
+					Expressions[curr].responseText = ""
+				}
+			} else {
+				Expressions[curr].responseText = ""
+			}
 			// Register this expression under its name for cross-reference
 			nameKey := strings.ToLower(Expressions[curr].name)
 			userFunctions[nameKey] = Expressions[curr].function
@@ -864,154 +889,25 @@ func CreateFunction(expr string) (func(float64) (float64, error), error) {
 	if err != nil {
 		return nil, err
 	}
+	// If the expression has no standalone variable 'x', evaluate once to a constant
+	isConstant := true
+	for _, t := range tokens {
+		if t.Type == VARIABLE {
+			isConstant = false
+			break
+		}
+	}
+
+	if isConstant {
+		val, err := evaluatePostfix(postfix, tokens, 0)
+		if err != nil {
+			return nil, err
+		}
+		return func(x float64) (float64, error) { return val, nil }, nil
+	}
 
 	return func(x float64) (float64, error) {
-		var stack []float64
-
-		for _, token := range postfix {
-			switch token.Type {
-			case NUMBER:
-				val := 0.0
-				fmt.Sscanf(token.Value, "%f", &val)
-				stack = append(stack, val)
-
-			case VARIABLE:
-				stack = append(stack, x)
-
-			case CONSTANT:
-				stack = append(stack, mathConstants[token.Value])
-
-			case OPERATOR:
-				if token.Value == "u-" {
-					if len(stack) < 1 {
-						return 0, errors.New("invalid expression: not enough operands for unary minus")
-					}
-					a := stack[len(stack)-1]
-					stack[len(stack)-1] = -a
-					break
-				}
-				if len(stack) < 2 {
-					return 0, errors.New("invalid expression: not enough operands")
-				}
-				b := stack[len(stack)-1]
-				stack = stack[:len(stack)-1]
-				a := stack[len(stack)-1]
-				stack = stack[:len(stack)-1]
-
-				var result float64
-				switch token.Value {
-				case "+":
-					result = a + b
-				case "-":
-					result = a - b
-				case "*":
-					result = a * b
-				case "/":
-					if b == 0 {
-						return 0, errors.New("division by zero")
-					}
-					result = a / b
-				case "^":
-					result = math.Pow(a, b)
-					if math.IsNaN(result) || math.IsInf(result, 0) {
-						return 0, errors.New("invalid power operation result")
-					}
-				}
-				stack = append(stack, result)
-
-			case FUNCTION:
-				if len(stack) < 1 {
-					return 0, errors.New("invalid expression: not enough arguments for function")
-				}
-				a := stack[len(stack)-1]
-				stack = stack[:len(stack)-1]
-
-				var result float64
-				if token.Value == "d/dx" {
-					// Get the original tokens that represent the inner expression
-					var innerTokens []Token
-					parenCount := 0
-					var startIndex int
-
-					// Find this specific d/dx function's tokens
-					for i := 0; i < len(tokens); i++ {
-						if tokens[i].Position == token.Position {
-							startIndex = i + 1
-							break
-						}
-					}
-
-					// Collect tokens for this specific d/dx instance
-					for i := startIndex; i < len(tokens); i++ {
-						if tokens[i].Type == LPAREN {
-							parenCount++
-							if parenCount == 1 {
-								continue // Skip the first opening parenthesis
-							}
-						} else if tokens[i].Type == RPAREN {
-							parenCount--
-							if parenCount == 0 {
-								break // Found the matching closing parenthesis
-							}
-						}
-						if parenCount > 0 {
-							innerTokens = append(innerTokens, tokens[i])
-						}
-					}
-
-					// Create a function from these tokens directly
-					innerExpr := tokensToString(innerTokens)
-					f, err := CreateFunction(innerExpr)
-					if err != nil {
-						return 0, err
-					}
-
-					result, err = NumericalDerivative(f, x)
-					if err != nil {
-						return 0, err
-					}
-				} else if f, exists := userFunctions[token.Value]; exists {
-					result, _ = f(a)
-				} else {
-					// Handle built in functions
-					switch token.Value {
-					case "ln":
-						if a <= 0 {
-							return 0, fmt.Errorf("domain error: ln(%f) - logarithm of non-positive number", a)
-						}
-						result = math.Log(a)
-					case "sqrt":
-						if a < 0 {
-							return 0, fmt.Errorf("domain error: sqrt(%f) - square root of negative number", a)
-						}
-						result = math.Sqrt(a)
-					case "asin", "acos":
-						if a < -1 || a > 1 {
-							return 0, fmt.Errorf("domain error: %s(%f) - argument must be between -1 and 1", token.Value, a)
-						}
-						if token.Value == "asin" {
-							result = math.Asin(a)
-						} else {
-							result = math.Acos(a)
-						}
-					default:
-						result = mathFuncs[token.Value](a)
-					}
-				}
-
-				// Check for general domain errors
-				if math.IsNaN(result) || math.IsInf(result, 0) {
-					return 0, fmt.Errorf("domain error: %s(%f) produced an invalid result", token.Value, a)
-				}
-				stack = append(stack, result)
-			}
-		}
-
-		if len(stack) != 1 {
-			return 0, errors.New("invalid expression: incorrect number of values in final stack")
-		}
-
-		return stack[0], nil
+		return evaluatePostfix(postfix, tokens, x)
 	}, nil
 }
 
@@ -1128,4 +1024,155 @@ func tokensToString(tokens []Token) string {
 		result.WriteString(token.Value)
 	}
 	return result.String()
+}
+
+// evaluatePostfix evaluates a postfix token list at a given x value.
+// It mirrors the logic in CreateFunction's evaluator and supports functions and derivatives.
+func evaluatePostfix(postfix []Token, tokens []Token, x float64) (float64, error) {
+	var stack []float64
+
+	for _, token := range postfix {
+		switch token.Type {
+		case NUMBER:
+			val := 0.0
+			fmt.Sscanf(token.Value, "%f", &val)
+			stack = append(stack, val)
+
+		case VARIABLE:
+			stack = append(stack, x)
+
+		case CONSTANT:
+			stack = append(stack, mathConstants[token.Value])
+
+		case OPERATOR:
+			if token.Value == "u-" {
+				if len(stack) < 1 {
+					return 0, errors.New("invalid expression: not enough operands for unary minus")
+				}
+				a := stack[len(stack)-1]
+				stack[len(stack)-1] = -a
+				break
+			}
+			if len(stack) < 2 {
+				return 0, errors.New("invalid expression: not enough operands")
+			}
+			b := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			a := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+
+			var result float64
+			switch token.Value {
+			case "+":
+				result = a + b
+			case "-":
+				result = a - b
+			case "*":
+				result = a * b
+			case "/":
+				if b == 0 {
+					return 0, errors.New("division by zero")
+				}
+				result = a / b
+			case "^":
+				result = math.Pow(a, b)
+				if math.IsNaN(result) || math.IsInf(result, 0) {
+					return 0, errors.New("invalid power operation result")
+				}
+			}
+			stack = append(stack, result)
+
+		case FUNCTION:
+			if len(stack) < 1 {
+				return 0, errors.New("invalid expression: not enough arguments for function")
+			}
+			a := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+
+			var result float64
+			if token.Value == "d/dx" {
+				// Get tokens for the inner expression of this d/dx occurrence
+				var innerTokens []Token
+				parenCount := 0
+				var startIndex int
+
+				// Find this specific d/dx function's tokens
+				for i := 0; i < len(tokens); i++ {
+					if tokens[i].Position == token.Position {
+						startIndex = i + 1
+						break
+					}
+				}
+
+				// Collect tokens for this specific d/dx instance
+				for i := startIndex; i < len(tokens); i++ {
+					if tokens[i].Type == LPAREN {
+						parenCount++
+						if parenCount == 1 {
+							continue // Skip the first opening parenthesis
+						}
+					} else if tokens[i].Type == RPAREN {
+						parenCount--
+						if parenCount == 0 {
+							break // Found the matching closing parenthesis
+						}
+					}
+					if parenCount > 0 {
+						innerTokens = append(innerTokens, tokens[i])
+					}
+				}
+
+				// Create a function from these tokens directly
+				innerExpr := tokensToString(innerTokens)
+				f, err := CreateFunction(innerExpr)
+				if err != nil {
+					return 0, err
+				}
+
+				result, err = NumericalDerivative(f, x)
+				if err != nil {
+					return 0, err
+				}
+			} else if f, exists := userFunctions[token.Value]; exists {
+				result, _ = f(a)
+			} else {
+				// Handle built in functions
+				switch token.Value {
+				case "ln":
+					if a <= 0 {
+						return 0, fmt.Errorf("domain error: ln(%f) - logarithm of non-positive number", a)
+					}
+					result = math.Log(a)
+				case "sqrt":
+					if a < 0 {
+						return 0, fmt.Errorf("domain error: sqrt(%f) - square root of negative number", a)
+					}
+					result = math.Sqrt(a)
+				case "asin", "acos":
+					if a < -1 || a > 1 {
+						return 0, fmt.Errorf("domain error: %s(%f) - argument must be between -1 and 1", token.Value, a)
+					}
+					if token.Value == "asin" {
+						result = math.Asin(a)
+					} else {
+						result = math.Acos(a)
+					}
+				default:
+					result = mathFuncs[token.Value](a)
+				}
+			}
+
+			// Check for general domain errors
+			if math.IsNaN(result) || math.IsInf(result, 0) {
+				return 0, fmt.Errorf("domain error: %s(%f) produced an invalid result", token.Value, a)
+			}
+			stack = append(stack, result)
+		}
+	}
+
+	if len(stack) != 1 {
+		return 0, errors.New("invalid expression: incorrect number of values in final stack")
+	}
+
+	return stack[0], nil
 }
