@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	graphSize       = 16
-	controlsSize    = graphSize / 3
-	informationSize = graphSize / 2
+	graphSize        = 16
+	controlsSize     = graphSize / 3
+	informationSize  = graphSize / 2
+	intersectionSize = graphSize / 2
 )
 
 func main() {
@@ -21,10 +22,11 @@ func main() {
 			modules.InformationUpdate()
 	})
 
-    graph := tview.NewFlex().SetDirection(tview.FlexColumnCSS).
-        AddItem(modules.Graph, 0, modules.GraphSize, false).
-        AddItem(modules.GraphTraversial(), 0, controlsSize, false).
-        AddItem(modules.Information, 0, informationSize, false)
+	graph := tview.NewFlex().SetDirection(tview.FlexColumnCSS).
+		AddItem(modules.Graph, 0, modules.GraphSize, false).
+		AddItem(modules.GraphTraversial(), 0, controlsSize, false).
+		AddItem(modules.Information, 0, informationSize, false).
+		AddItem(modules.IntersectionBox, 0, intersectionSize, false)
 
 	full := tview.NewFlex().
 		AddItem(modules.ExpressionBox, 0, 1, false).
